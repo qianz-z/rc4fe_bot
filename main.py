@@ -96,16 +96,24 @@ def user_register_mobile(update, context):
     user_name = context.user_data['name']
     text = f"{user_name}, with contact number of {user_mobile} will be saved in my brain's memory. \n"
     text += "Which is the cool house that you are in?"
-    update.message.reply_text(text)
+    
+    keyboard = [
+        [InlineKeyboardButton("Aquila", callback_data='Aquila')],
+        [InlineKeyboardButton("Ursa", callback_data='Ursa')],
+        [InlineKeyboardButton("Noctua", callback_data='Noctua')],
+        [InlineKeyboardButton("Leo", callback_data='Leo')],
+        [InlineKeyboardButton("Draco", callback_data='Draco')],
+    ]
+    update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     return USER_REGISTER_HOUSE
 
 def user_register_house(update, context):
-    user_house = update.message.text
+    user_house = update.callback_query.data
     context.user_data['house'] = user_house
 
     text = f"{user_house} best house! \n"
     text += "Last question, what is your room number?"
-    update.message.reply_text(text)
+    update.callback_query.message.chat.send_message(text)
     return USER_REGISTER_ROOM
 
 def user_register_room(update, context):
@@ -171,7 +179,7 @@ if __name__ == '__main__':
                 MessageHandler(Filters.text, callback=user_register_mobile),
             ],
             USER_REGISTER_HOUSE:[
-                MessageHandler(Filters.text, callback=user_register_house),
+                CallbackQueryHandler(user_register_house),
             ],
             USER_REGISTER_ROOM:[
                 MessageHandler(Filters.text, callback=user_register_room),
