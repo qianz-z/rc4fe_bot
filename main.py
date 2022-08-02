@@ -1,3 +1,4 @@
+from curses.ascii import isdigit
 import traceback
 
 from telegram import (
@@ -93,7 +94,17 @@ def user_register_mobile(update, context):
     user_mobile = update.message.text
     context.user_data['mobile'] = user_mobile
 
+    if not user_mobile.isnumeric():
+        text = "Please enter numbers!"
+        update.message.reply_text(text)
+        return USER_REGISTER_MOBILE
+    elif int(user_mobile) < 70000000:
+        text = "Please enter a Singapore mobile number!"
+        update.message.reply_text(text)
+        return USER_REGISTER_MOBILE
+
     user_name = context.user_data['name']
+    user_mobile = int(user_mobile)
     text = f"{user_name}, with contact number of {user_mobile} will be saved in my brain's memory. \n"
     text += "Which is the cool house that you are in?"
     
@@ -132,7 +143,8 @@ def user_register_room(update, context):
 
 def user_order(update, context):
     update.callback_query.delete_message()
-    text = "Bob will now take the order for you..."
+    text = "Bob will now take the order for you... \n"
+    text += "First item on the menu is "
     print(text)
     update.callback_query.message.chat.send_message(text)
     return
