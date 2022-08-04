@@ -27,6 +27,10 @@ _STATES = [
     'USER_REGISTER_MOBILE',
     'USER_REGISTER_HOUSE',
     'USER_REGISTER_ROOM',
+    'EDIT_USER',
+    'EDIT_USER_CATEGORY',
+    'EDIT_USER_UPDATED',
+    'EDIT_USER_UPDATED_HOUSE',
 ]
 
 # Set some state variables
@@ -53,6 +57,7 @@ def start(update, context):
         context.user_data["mobile"] = None
         context.user_data["house"] = None
         context.user_data["room"] = None
+        context.user_data["edit_category"] = None
         print("RC4fe Bob is alive!")
         return user_menu(update, context)
     else:
@@ -65,7 +70,9 @@ def start(update, context):
 def user_menu(update, context):
     keyboard = []
     if not context.user_data['name']:
-        keyboard.append([InlineKeyboardButton("Register", callback_data='user_register')]),
+        keyboard.append([InlineKeyboardButton("Register", callback_data='user_register')])
+    else:
+        keyboard.append([InlineKeyboardButton("Edit Profile", callback_data='edit_user')])
     
     keyboard.append([InlineKeyboardButton("Order", callback_data='user_order')])
     keyboard.append([InlineKeyboardButton("Remind", callback_data='user_remind')])
@@ -140,6 +147,92 @@ def user_register_room(update, context):
     update.message.reply_text(text)
     return USER_MENU
 
+def edit_user(update, context):
+    user_name = context.user_data['name']
+    user_mobile = context.user_data['mobile']
+    user_house = context.user_data['house']
+    user_room = context.user_data['room']
+    text = f"Name: {user_name} \n"
+    text += f"Mobile Number: {user_mobile} \n"
+    text += f"House: {user_house} \n"
+    text += f"Room Number: {user_room} \n \n"
+
+    text += "Would you like to edit your profile?"
+    keyboard = [
+        [InlineKeyboardButton("Yes", callback_data='yes')],
+        [InlineKeyboardButton("No", callback_data='no')],
+    ]
+    update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    return EDIT_USER
+
+def edit_user_followup(update, context):
+    response = update.callback_query.data
+    if response == "no":
+        text = "Your profile will be just as it is, and there will be no changes. \n"
+        text += "You can head back to /user_menu for more functions."
+        update.callback_query.message.chat.send_message(text)
+        return USER_MENU
+    else:
+        text = "You have chosen to update your profile. Which of the following needs to be updated?"
+        keyboard = [
+            [InlineKeyboardButton("Name", callback_data='name')],
+            [InlineKeyboardButton("Mobile Number", callback_data='mobile')],
+            [InlineKeyboardButton("House", callback_data='house')],
+            [InlineKeyboardButton("Room Number", callback_data='room')],
+        ]
+        update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return EDIT_USER_CATEGORY
+
+def edit_user_category(update, context):
+    category = update.callback_query.data
+    context.user_data['edit_category'] = category
+    text = f"You have chosen to edit the category of {category}. \n"
+    text += "Please enter the updated version."
+    if category == "house":
+        keyboard = [
+            [InlineKeyboardButton("Aquila", callback_data='Aquila')],
+            [InlineKeyboardButton("Ursa", callback_data='Ursa')],
+            [InlineKeyboardButton("Noctua", callback_data='Noctua')],
+            [InlineKeyboardButton("Leo", callback_data='Leo')],
+            [InlineKeyboardButton("Draco", callback_data='Draco')],
+        ]
+        update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return EDIT_USER_UPDATED_HOUSE
+
+    update.callback_query.message.chat.send_message(text)
+    return EDIT_USER_UPDATED
+
+def edit_user_updated_house(update, context):
+    house = update.callback_query.data
+    text = f"Your house has been changed to {house}. \n"
+    text += f"You can head back to /user_menu for other functions."
+    context.user_data['house'] = house
+    update.callback_query.message.chat.send_message(text)
+    return USER_MENU
+
+def edit_user_updated(update, context):
+    response = update.message.text
+    category = context.user_data['edit_category'] 
+    if category == "name":
+        text = f"Your name has been updated to {response}. Nice to meet you! \n"
+        context.user_data['name'] = response
+    elif category == "mobile": 
+        if not response.isnumeric():
+            text = "Please enter numbers!"
+            update.message.reply_text(text)
+            return EDIT_USER_UPDATED
+        elif int(response) < 70000000:
+            text = "Please enter a Singapore mobile number!"
+            update.message.reply_text(text)
+            return EDIT_USER_UPDATED
+        context.user_data['mobile'] = response
+    elif category == "room":
+        text = f"Your room has been updated to {response}. Nice to stalking you! \n"
+        context.user_data['room'] = response
+    
+    text += f"You can head back to /user_menu for other functions."
+    update.message.reply_text(text)
+    return USER_MENU
 
 def user_order(update, context):
     update.callback_query.delete_message()
@@ -178,6 +271,7 @@ if __name__ == '__main__':
              # current status: whatisreceivedfromuser(function to be called, pattern  = 'callback_data')
             USER_MENU: [
                 CallbackQueryHandler(user_register, pattern='user_register'),
+                CallbackQueryHandler(edit_user, pattern='edit_user'),
                 CallbackQueryHandler(user_order, pattern='user_order'),
                 CallbackQueryHandler(user_remind, pattern='user_remind'),
             ],
@@ -196,6 +290,18 @@ if __name__ == '__main__':
             USER_REGISTER_ROOM:[
                 MessageHandler(Filters.text, callback=user_register_room),
             ],
+            EDIT_USER:[
+                CallbackQueryHandler(edit_user_followup),
+            ],
+            EDIT_USER_CATEGORY:[
+                CallbackQueryHandler(edit_user_category),
+            ],
+            EDIT_USER_UPDATED_HOUSE:[
+                CallbackQueryHandler(edit_user_updated_house),
+            ],
+            EDIT_USER_UPDATED:[
+                MessageHandler(Filters.text, callback=edit_user_updated),
+            ]
         },
 
         # after /start, these commands will take over for menu page
@@ -210,6 +316,12 @@ if __name__ == '__main__':
     dispatcher = updater.dispatcher
     dispatcher.add_handler(top_conv)
     # dispatcher.add_error_handler(err)
+    dispatcher.user_data[757010830] = {
+        'name': "Qian",
+        'mobile': 823167842163,
+        'house': "Draco",
+        'room': 1232,
+    }
 
     updater.start_polling()
     updater.idle()
