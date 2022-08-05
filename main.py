@@ -31,6 +31,10 @@ _STATES = [
     'EDIT_USER_CATEGORY',
     'EDIT_USER_UPDATED',
     'EDIT_USER_UPDATED_HOUSE',
+    'ADMIN_ORDER_NAME',
+    'ADMIN_ORDER_DESC',
+    'ADMIN_ORDER_PRICE',
+    'ADMIN_ORDER_PHOTO',
 ]
 
 # Set some state variables
@@ -80,8 +84,11 @@ def user_menu(update, context):
 
     text = "What would you like Bob to do?"
     update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    # chat_id = update.message.chat_id
+    # print("CHAT ID IS ", chat_id)
     return USER_MENU
 
+# USER REGISTER 
 def user_register(update, context):
     update.callback_query.delete_message()
     text = "Hello! My Name is Bob and I am here to serve your needs for admin stuffs related to RC4fe. \n"
@@ -147,6 +154,8 @@ def user_register_room(update, context):
     update.message.reply_text(text)
     return USER_MENU
 
+# USER EDIT 
+
 def edit_user(update, context):
     user_name = context.user_data['name']
     user_mobile = context.user_data['mobile']
@@ -186,7 +195,7 @@ def edit_user_followup(update, context):
 def edit_user_category(update, context):
     category = update.callback_query.data
     context.user_data['edit_category'] = category
-    text = f"You have chosen to edit the category of {category}. \n"
+    text = f"You have chosen to update your {category}. \n"
     text += "Please enter the updated version."
     if category == "house":
         keyboard = [
@@ -203,6 +212,7 @@ def edit_user_category(update, context):
     return EDIT_USER_UPDATED
 
 def edit_user_updated_house(update, context):
+    update.callback_query.delete_message()
     house = update.callback_query.data
     text = f"Your house has been changed to {house}. \n"
     text += f"You can head back to /user_menu for other functions."
@@ -234,13 +244,15 @@ def edit_user_updated(update, context):
     update.message.reply_text(text)
     return USER_MENU
 
+# USER ORDER 
+
 def user_order(update, context):
     update.callback_query.delete_message()
     text = "Bob will now take the order for you... \n"
     text += "First item on the menu is "
     print(text)
     update.callback_query.message.chat.send_message(text)
-    return
+    return 
 
 def user_remind(update, context):
     update.callback_query.delete_message()
@@ -252,17 +264,100 @@ def user_remind(update, context):
 
 def admin_menu(update, context):
     keyboard = [
-        [InlineKeyboardButton("order", callback_data='order'), ],
-
+        [InlineKeyboardButton("Order", callback_data='admin_order'), ],
     ]
+    context.bot_data["total_num_of_orders"] = 0  # 1-indexed
+    context.bot_data["curr_order_index"] = 0 # start from 0
+    context.bot_data["orders"] = []
+    context.bot_data["orders"].append({ # for 1-indexing
+        "order_index": 0,
+        "name": None,
+        "desc": None,
+        "price": None,
+    })
     text = "Welcome to the admin menu! Bob is at your command..."
     update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    print("An admin has started the bot")
     return ADMIN_MENU
 
 def admin_order(update, context):
-    text = "ADMIN ORDER"
+    text = "ADMIN ORDER FUNCTION! Please tell Bob the name of the item.\n"
+    text += "If there isn't any more items to be added, please type 'NA'"
+    update.callback_query.message.chat.send_message(text)
+    return ADMIN_ORDER_NAME
+
+def admin_order_name(update, context):
+    name = update.message.text
+    if name.lower() == "na":
+        text = "That will be the end of the order list. \n"
+        text += "You can head back to /admin_menu for other functions."
+        update.message.reply_text(text)
+        return ADMIN_MENU
+
+    context.bot_data["total_num_of_orders"] += 1
+    context.bot_data["curr_order_index"] += 1
+    total_num_of_orders = context.bot_data["total_num_of_orders"] 
+    curr_order_index = context.bot_data["curr_order_index"]
+    text = f"Total number of orders: {total_num_of_orders} \n "
+    text += f"Current order index: {curr_order_index} \n "
+    text += f"The item name will be {name} \n"
+    context.bot_data["orders"].append({
+        "order_index": curr_order_index,
+        "name": None,
+        "desc": None,
+        "price": None,
+        "photo": None
+    })
+    context.bot_data["orders"][curr_order_index]["name"] = name    
+
+    text += "Now, do give a short description of the item"
     update.message.reply_text(text)
-    return
+    return ADMIN_ORDER_DESC
+
+def admin_order_desc(update, context):
+    desc = update.message.text
+    text = f"Description saved! \n"
+    text += "How much will you be selling this for?"
+
+    curr_order_index = context.bot_data["curr_order_index"]
+    context.bot_data["orders"][curr_order_index]["desc"] = desc  
+    update.message.reply_text(text)
+    return ADMIN_ORDER_PRICE
+
+def admin_order_price(update, context):
+    price = update.message.text
+    try:
+        if float(price) or int(price):
+            curr_order_index = context.bot_data["curr_order_index"]
+            context.bot_data["orders"][curr_order_index]["price"] = price  
+            item = context.bot_data["orders"][curr_order_index]["name"]
+            text = f"The price for {item} will be at ${price}. \n"
+            text += "Please insert a photo so that people can have some visualisation of what the item is."
+            update.message.reply_text(text)
+            return ADMIN_ORDER_PHOTO
+    except:
+        text = "Please provide in integer or float values."
+        update.message.reply_text(text)
+        return ADMIN_ORDER_PRICE
+
+def admin_order_photo(update, context):
+    photo = update.message.photo[-1].file_id
+    curr_order_index = context.bot_data["curr_order_index"]
+    context.bot_data["orders"][curr_order_index]["photo"] = photo
+    text = f"Photo captured! \n"
+    text += "You can continue adding items from /admin_menu order function."
+    chat_id = update.message.chat_id
+    context.bot.send_photo(
+        chat_id,
+        photo=photo,
+        caption=(
+            "PHOTO"
+        )
+    )
+    print(context.bot_data["orders"])
+    update.message.reply_text(text)
+    return ADMIN_MENU
+
 
 if __name__ == '__main__':
     top_conv = ConversationHandler(
@@ -274,9 +369,6 @@ if __name__ == '__main__':
                 CallbackQueryHandler(edit_user, pattern='edit_user'),
                 CallbackQueryHandler(user_order, pattern='user_order'),
                 CallbackQueryHandler(user_remind, pattern='user_remind'),
-            ],
-            ADMIN_MENU: [
-                CallbackQueryHandler(admin_order, pattern='admin_order'),
             ],
             USER_REGISTER_NAME: [
                 MessageHandler(Filters.text, callback=user_register_name),
@@ -301,7 +393,22 @@ if __name__ == '__main__':
             ],
             EDIT_USER_UPDATED:[
                 MessageHandler(Filters.text, callback=edit_user_updated),
-            ]
+            ],
+            ADMIN_MENU: [
+                CallbackQueryHandler(admin_order, pattern='admin_order'),
+            ],
+            ADMIN_ORDER_NAME:[
+                MessageHandler(Filters.text, callback=admin_order_name),
+            ],
+            ADMIN_ORDER_DESC:[
+                MessageHandler(Filters.text, callback=admin_order_desc),
+            ],
+            ADMIN_ORDER_PRICE:[
+                MessageHandler(Filters.text, callback=admin_order_price),
+            ],
+            ADMIN_ORDER_PHOTO:[
+                MessageHandler(Filters.all, callback=admin_order_photo),
+            ],
         },
 
         # after /start, these commands will take over for menu page
