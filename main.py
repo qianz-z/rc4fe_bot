@@ -31,10 +31,12 @@ _STATES = [
     'EDIT_USER_CATEGORY',
     'EDIT_USER_UPDATED',
     'EDIT_USER_UPDATED_HOUSE',
-    'ADMIN_ORDER_NAME',
-    'ADMIN_ORDER_DESC',
-    'ADMIN_ORDER_PRICE',
-    'ADMIN_ORDER_PHOTO',
+    'ADMIN_ORDER_FUNCTIONS',
+    'ADMIN_ORDER_ADD_NAME',
+    'ADMIN_ORDER_ADD_DESC',
+    'ADMIN_ORDER_ADD_PRICE',
+    'ADMIN_ORDER_ADD_PHOTO',
+    'ADMIN_ORDER_EDIT_ITEM',
 ]
 
 # Set some state variables
@@ -52,6 +54,16 @@ def start(update, context):
         if chat_id in USER_ADMINS:
             text = "Welcome to the exclusive ADMINS ONLY page!!!!"
             update.message.reply_text(text)
+            context.bot_data["total_num_of_orders"] = 0  # 1-indexed
+            context.bot_data["curr_order_index"] = 1 # start from 0
+            context.bot_data["orders"] = []
+            context.bot_data["orders"].append({ # for 1-indexing
+                "order_index": 0,
+                "name": None,
+                "desc": None,
+                "price": None,
+                "photo": None
+            })
             return admin_menu(update, context)
 
         # RESIDENTS
@@ -266,34 +278,42 @@ def admin_menu(update, context):
     keyboard = [
         [InlineKeyboardButton("Order", callback_data='admin_order'), ],
     ]
-    context.bot_data["total_num_of_orders"] = 0  # 1-indexed
-    context.bot_data["curr_order_index"] = 0 # start from 0
-    context.bot_data["orders"] = []
-    context.bot_data["orders"].append({ # for 1-indexing
-        "order_index": 0,
-        "name": None,
-        "desc": None,
-        "price": None,
-    })
+    if context.bot_data["curr_order_index"] == 0:
+        context.bot_data["orders"].append({ # for 1-indexing
+            "order_index": 0,
+            "name": None,
+            "desc": None,
+            "price": None,
+            "photo": None
+        })
     text = "Welcome to the admin menu! Bob is at your command..."
     update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     print("An admin has started the bot")
     return ADMIN_MENU
 
 def admin_order(update, context):
-    text = "ADMIN ORDER FUNCTION! Please tell Bob the name of the item.\n"
-    text += "If there isn't any more items to be added, please type 'NA'"
+    keyboard = []
+    total_num_of_orders = context.bot_data["total_num_of_orders"]
+    text = f"Total number of orders: {total_num_of_orders}. \n"
+
+    keyboard.append([InlineKeyboardButton("Add", callback_data='admin_order_add')])
+    keyboard.append([InlineKeyboardButton("Edit", callback_data='admin_order_edit')])
+    keyboard.append([InlineKeyboardButton("Remove", callback_data='admin_order_remove')])
+    keyboard.append([InlineKeyboardButton("Remove All", callback_data='admin_order_remove_all')])
+    text += "To add in new items, you can click the 'Add' keyboard.\n"
+    text += "If there isn't any more items to be added, please click the 'remove' keyboard."
+    update.callback_query.message.chat.send_message(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    return ADMIN_ORDER_FUNCTIONS
+
+def admin_order_add(update, context):
+    update.callback_query.delete_message()
+    text = "You have selected to add on to the current list of orders. \n"
+    text += "Let's start off with the name of the item that you are selling. \n"
     update.callback_query.message.chat.send_message(text)
-    return ADMIN_ORDER_NAME
+    return ADMIN_ORDER_ADD_NAME
 
-def admin_order_name(update, context):
+def admin_order_add_name(update, context):
     name = update.message.text
-    if name.lower() == "na":
-        text = "That will be the end of the order list. \n"
-        text += "You can head back to /admin_menu for other functions."
-        update.message.reply_text(text)
-        return ADMIN_MENU
-
     context.bot_data["total_num_of_orders"] += 1
     context.bot_data["curr_order_index"] += 1
     total_num_of_orders = context.bot_data["total_num_of_orders"] 
@@ -312,9 +332,9 @@ def admin_order_name(update, context):
 
     text += "Now, do give a short description of the item"
     update.message.reply_text(text)
-    return ADMIN_ORDER_DESC
+    return ADMIN_ORDER_ADD_DESC
 
-def admin_order_desc(update, context):
+def admin_order_add_desc(update, context):
     desc = update.message.text
     text = f"Description saved! \n"
     text += "How much will you be selling this for?"
@@ -322,9 +342,9 @@ def admin_order_desc(update, context):
     curr_order_index = context.bot_data["curr_order_index"]
     context.bot_data["orders"][curr_order_index]["desc"] = desc  
     update.message.reply_text(text)
-    return ADMIN_ORDER_PRICE
+    return ADMIN_ORDER_ADD_PRICE
 
-def admin_order_price(update, context):
+def admin_order_add_price(update, context):
     price = update.message.text
     try:
         if float(price) or int(price):
@@ -334,29 +354,61 @@ def admin_order_price(update, context):
             text = f"The price for {item} will be at ${price}. \n"
             text += "Please insert a photo so that people can have some visualisation of what the item is."
             update.message.reply_text(text)
-            return ADMIN_ORDER_PHOTO
+            return ADMIN_ORDER_ADD_PHOTO
     except:
         text = "Please provide in integer or float values."
         update.message.reply_text(text)
-        return ADMIN_ORDER_PRICE
+        return ADMIN_ORDER_ADD_PRICE
 
-def admin_order_photo(update, context):
+def admin_order_add_photo(update, context):
     photo = update.message.photo[-1].file_id
     curr_order_index = context.bot_data["curr_order_index"]
     context.bot_data["orders"][curr_order_index]["photo"] = photo
     text = f"Photo captured! \n"
     text += "You can continue adding items from /admin_menu order function."
-    chat_id = update.message.chat_id
-    context.bot.send_photo(
-        chat_id,
-        photo=photo,
-        caption=(
-            "PHOTO"
-        )
-    )
-    print(context.bot_data["orders"])
     update.message.reply_text(text)
-    return ADMIN_MENU
+    chat_id = update.message.chat_id
+    try:
+        context.bot.send_photo(
+            chat_id,
+            photo=photo,
+            caption=(
+                "PHOTO"
+            )
+        )
+        return ADMIN_MENU
+    except IndexError:
+        text = "Please send a photo! \n"
+        update.message.reply_text(text)
+        return ADMIN_ORDER_ADD_PRICE
+
+def admin_order_edit(update, context):
+    keyboard = []
+    total_num_of_orders = context.bot_data["total_num_of_orders"]
+    for order_index in range(1, total_num_of_orders+1):
+        order_name = context.bot_data["orders"][order_index]["name"]
+        keyboard.append([InlineKeyboardButton(order_name, callback_data=order_name)])
+        print(order_name)
+    text = "These are the current orders that Bob knows. You can click into any of them to edit. \n"
+    update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    return ADMIN_ORDER_EDIT_ITEM
+
+def admin_order_remove(update, context):
+    text = "Choose which order to remove. \n"
+    keyboard = []
+    for order_name in context.bot_data["orders"]:
+        keyboard.append([InlineKeyboardButton(order_name, callback_data=order_name)])
+    update.callback_query.message.chat.send_message(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+def admin_order_remove_all(update, context):
+    context.bot_data["total_num_of_orders"] = 0  # 1-indexed
+    context.bot_data["curr_order_index"] = 0 # start from 0
+    context.bot_data["orders"] = []
+    text = "All of the previous orders have been cleared. \n"
+    text = f"Total number of orders: {total_num_of_orders} \n "
+    text += f"Current order index: {curr_order_index} \n "
+    update.callback_query.message.chat.send_message(text)
+    return 
 
 
 if __name__ == '__main__':
@@ -395,19 +447,28 @@ if __name__ == '__main__':
                 MessageHandler(Filters.text, callback=edit_user_updated),
             ],
             ADMIN_MENU: [
-                CallbackQueryHandler(admin_order, pattern='admin_order'),
+                CallbackQueryHandler(admin_order)
             ],
-            ADMIN_ORDER_NAME:[
-                MessageHandler(Filters.text, callback=admin_order_name),
+            ADMIN_ORDER_FUNCTIONS: [ #NEW
+                CallbackQueryHandler(admin_order_add, pattern='admin_order_add'),
+                CallbackQueryHandler(admin_order_edit, pattern='admin_order_edit'),
+                CallbackQueryHandler(admin_order_remove, pattern='admin_order_remove'),
+                CallbackQueryHandler(admin_order_remove_all, pattern='admin_order_remove_all'),
             ],
-            ADMIN_ORDER_DESC:[
-                MessageHandler(Filters.text, callback=admin_order_desc),
+            ADMIN_ORDER_ADD_NAME:[
+                MessageHandler(Filters.text, callback=admin_order_add_name),
             ],
-            ADMIN_ORDER_PRICE:[
-                MessageHandler(Filters.text, callback=admin_order_price),
+            ADMIN_ORDER_ADD_DESC:[
+                MessageHandler(Filters.text, callback=admin_order_add_desc),
             ],
-            ADMIN_ORDER_PHOTO:[
-                MessageHandler(Filters.all, callback=admin_order_photo),
+            ADMIN_ORDER_ADD_PRICE:[
+                MessageHandler(Filters.text, callback=admin_order_add_price),
+            ],
+            ADMIN_ORDER_ADD_PHOTO:[
+                MessageHandler(Filters.all, callback=admin_order_add_photo),
+            ],
+            ADMIN_ORDER_EDIT_ITEM:[
+                CallbackQueryHandler(admin_order_edit_item)
             ],
         },
 
@@ -423,12 +484,14 @@ if __name__ == '__main__':
     dispatcher = updater.dispatcher
     dispatcher.add_handler(top_conv)
     # dispatcher.add_error_handler(err)
-    dispatcher.user_data[757010830] = {
-        'name': "Qian",
-        'mobile': 823167842163,
-        'house': "Draco",
-        'room': 1232,
-    }
+    # dispatcher.bot_data["total_num_of_orders"] = 1
+    # dispatcher.bot_data["orders"][1] = {
+    #     "order_index": 1,
+    #     'name': "Qian",
+    #     'desc': "this",
+    #     'price': 6,
+    #     'photo': None,
+    # }
 
     updater.start_polling()
     updater.idle()
