@@ -55,15 +55,16 @@ def start(update, context):
             text = "Welcome to the exclusive ADMINS ONLY page!!!!"
             update.message.reply_text(text)
             context.bot_data["total_num_of_orders"] = 0  # 1-indexed
-            context.bot_data["curr_order_index"] = 1 # start from 0
+            context.bot_data["curr_order_index"] = 0 # start from 0
             context.bot_data["orders"] = []
-            context.bot_data["orders"].append({ # for 1-indexing
-                "order_index": 0,
-                "name": None,
-                "desc": None,
-                "price": None,
-                "photo": None
-            })
+            if context.bot_data["curr_order_index"] == 0:
+                context.bot_data["orders"].append({ # for 1-indexing
+                    "order_index": 0,
+                    "name": None,
+                    "desc": None,
+                    "price": None,
+                    "photo": None
+                })
             return admin_menu(update, context)
 
         # RESIDENTS
@@ -393,23 +394,43 @@ def admin_order_edit(update, context):
     update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     return ADMIN_ORDER_EDIT_ITEM
 
+def admin_order_edit_item(update, context):
+    item = update.callback_query.data
+    text = f"You have chosen to edit {item}. \n"
+    item_index = context.bot_data["order"].index({"name": item}) #FIND THE INDEX OF THE ITEM
+    text = f"Index of the item is {item_index}"
+    update.callback_query.message.chat.send_message(text)
+    return
+
 def admin_order_remove(update, context):
     text = "Choose which order to remove. \n"
     keyboard = []
-    for order_name in context.bot_data["orders"]:
+    total_num_of_orders = context.bot_data["total_num_of_orders"]
+    for order_index in range(1, total_num_of_orders+1):
+        order_name = context.bot_data["orders"][order_index]["name"]
         keyboard.append([InlineKeyboardButton(order_name, callback_data=order_name)])
-    update.callback_query.message.chat.send_message(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    return ADMIN_ORDER_REMOVE_ITEM
+
+def admin_order_remove_item(update, context):
+    item = update.callback_query.data
+    text = f"{item} removed! \n"
+    # Find the position of the item in the list
+    # Pop item and bring the rest forward.
+    # Total num of orders -= 1
+
+    update.callback_query.message.chat.send_message(text)
+    return ADMIN_MENU
 
 def admin_order_remove_all(update, context):
-    context.bot_data["total_num_of_orders"] = 0  # 1-indexed
+    total_num_of_orders = 0
+    context.bot_data["total_num_of_orders"] = total_num_of_orders  # 1-indexed
     context.bot_data["curr_order_index"] = 0 # start from 0
     context.bot_data["orders"] = []
     text = "All of the previous orders have been cleared. \n"
     text = f"Total number of orders: {total_num_of_orders} \n "
-    text += f"Current order index: {curr_order_index} \n "
-    update.callback_query.message.chat.send_message(text)
-    return 
-
+    update.callback_query.message.edit_text(text)
+    return ADMIN_MENU
 
 if __name__ == '__main__':
     top_conv = ConversationHandler(
@@ -469,6 +490,9 @@ if __name__ == '__main__':
             ],
             ADMIN_ORDER_EDIT_ITEM:[
                 CallbackQueryHandler(admin_order_edit_item)
+            ],
+            ADMIN_ORDER_REMOVE_ITEM:[
+                CallbackQueryHandler(admin_order_remove_item)
             ],
         },
 
