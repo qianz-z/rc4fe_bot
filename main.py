@@ -39,6 +39,8 @@ _STATES = [
     'ADMIN_ORDER_ADD_PHOTO',
     'ADMIN_ORDER_EDIT_ITEM',
     'ADMIN_ORDER_REMOVE_ITEM',
+    'ADMIN_ORDER_EDIT_ITEM_CATEGORY',
+    'ADMIN_ORDER_EDIT_ITEM_UPDATED',
 ]
 
 # Set some state variables
@@ -56,6 +58,8 @@ def start(update, context):
         if chat_id in USER_ADMINS:
             text = "Welcome to the exclusive ADMINS ONLY page!!!!"
             update.message.reply_text(text)
+            context.user_data["edit_index"] = None
+            context.user_data["edit_category"] = None
             context.bot_data["total_num_of_orders"] = 0  # 1-indexed
             context.bot_data["curr_order_index"] = 0 # start from 0
             context.bot_data["orders"] = []
@@ -401,9 +405,46 @@ def admin_order_edit_item(update, context):
     print(context.bot_data["orders"])
     print("FIND THIS: ", item)
     item_index = list(map(itemgetter('name'), context.bot_data["orders"])).index(item)
-    text += f"Index of the item is {item_index}"
+    context.user_data["edit_index"] = item_index
+    text += "Now, look carefully on the details for the item, and select which one to edit. \n"
+    order = context.bot_data["orders"][item_index]
+    text += f"Name: {order['name']}\n"
+    text += f"Desc: {order['desc']}\n"
+    text += f"Price: {order['price']}\n"
+    text += f"Photo: {order['photo']}\n"
+    
+    keyboard = [
+        [InlineKeyboardButton("Name", callback_data='name')],
+        [InlineKeyboardButton("Desc", callback_data='desc')],
+        [InlineKeyboardButton("Price", callback_data='price')],
+        [InlineKeyboardButton("Photo", callback_data='photo')],
+    ]
+    update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    return ADMIN_ORDER_EDIT_ITEM_CATEGORY
+
+def admin_order_edit_item_category(update, context):
+    category = update.callback_query.data
+    text = f"You have chosen to edit the {category}. \n"
+    if category == "price":
+        text += "Price has to be a float in 2 decimal places. (There will be no checks here) \n"
+    text += "Please send the updated version to me in the next text. \n"
     update.callback_query.message.chat.send_message(text)
-    return
+    context.user_data["edit_category"] = category
+    return ADMIN_ORDER_EDIT_ITEM_UPDATED
+
+def admin_order_edit_item_updated(update, context):
+    message = update.message.text
+    item_index = context.user_data["edit_index"]
+    category = context.user_data["edit_category"]
+    order = context.bot_data["orders"][item_index]
+    order[category] = message
+    text = "This is the updated list, and if you wish to update anything else, please head back to /admin_menu. \n"
+    text += f"Name: {order['name']}\n"
+    text += f"Desc: {order['desc']}\n"
+    text += f"Price: {order['price']}\n"
+    text += f"Photo: {order['photo']}\n"
+    update.message.reply_text(text)
+    return ADMIN_MENU
 
 def admin_order_remove(update, context):
     text = "Choose which order to remove. \n"
@@ -493,6 +534,12 @@ if __name__ == '__main__':
             ],
             ADMIN_ORDER_EDIT_ITEM:[
                 CallbackQueryHandler(admin_order_edit_item)
+            ],
+            ADMIN_ORDER_EDIT_ITEM_CATEGORY:[
+                CallbackQueryHandler(admin_order_edit_item_category)
+            ],
+            ADMIN_ORDER_EDIT_ITEM_UPDATED:[
+                MessageHandler(Filters.text, callback=admin_order_edit_item_updated),
             ],
             ADMIN_ORDER_REMOVE_ITEM:[
                 CallbackQueryHandler(admin_order_remove_item)
