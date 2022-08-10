@@ -1,5 +1,6 @@
 from curses.ascii import isdigit
 import traceback
+from operator import itemgetter
 
 from telegram import (
     InlineKeyboardMarkup,
@@ -37,6 +38,7 @@ _STATES = [
     'ADMIN_ORDER_ADD_PRICE',
     'ADMIN_ORDER_ADD_PHOTO',
     'ADMIN_ORDER_EDIT_ITEM',
+    'ADMIN_ORDER_REMOVE_ITEM',
 ]
 
 # Set some state variables
@@ -57,7 +59,7 @@ def start(update, context):
             context.bot_data["total_num_of_orders"] = 0  # 1-indexed
             context.bot_data["curr_order_index"] = 0 # start from 0
             context.bot_data["orders"] = []
-            if context.bot_data["curr_order_index"] == 0:
+            if len(context.bot_data["orders"]) == 0:
                 context.bot_data["orders"].append({ # for 1-indexing
                     "order_index": 0,
                     "name": None,
@@ -279,7 +281,7 @@ def admin_menu(update, context):
     keyboard = [
         [InlineKeyboardButton("Order", callback_data='admin_order'), ],
     ]
-    if context.bot_data["curr_order_index"] == 0:
+    if len(context.bot_data["orders"]) == 0:
         context.bot_data["orders"].append({ # for 1-indexing
             "order_index": 0,
             "name": None,
@@ -324,13 +326,11 @@ def admin_order_add_name(update, context):
     text += f"The item name will be {name} \n"
     context.bot_data["orders"].append({
         "order_index": curr_order_index,
-        "name": None,
+        "name": name,
         "desc": None,
         "price": None,
         "photo": None
     })
-    context.bot_data["orders"][curr_order_index]["name"] = name    
-
     text += "Now, do give a short description of the item"
     update.message.reply_text(text)
     return ADMIN_ORDER_ADD_DESC
@@ -377,6 +377,7 @@ def admin_order_add_photo(update, context):
                 "PHOTO"
             )
         )
+        print(context.bot_data["orders"])
         return ADMIN_MENU
     except IndexError:
         text = "Please send a photo! \n"
@@ -397,8 +398,10 @@ def admin_order_edit(update, context):
 def admin_order_edit_item(update, context):
     item = update.callback_query.data
     text = f"You have chosen to edit {item}. \n"
-    item_index = context.bot_data["order"].index({"name": item}) #FIND THE INDEX OF THE ITEM
-    text = f"Index of the item is {item_index}"
+    print(context.bot_data["orders"])
+    print("FIND THIS: ", item)
+    item_index = list(map(itemgetter('name'), context.bot_data["orders"])).index(item)
+    text += f"Index of the item is {item_index}"
     update.callback_query.message.chat.send_message(text)
     return
 
@@ -509,13 +512,15 @@ if __name__ == '__main__':
     dispatcher.add_handler(top_conv)
     # dispatcher.add_error_handler(err)
     # dispatcher.bot_data["total_num_of_orders"] = 1
-    # dispatcher.bot_data["orders"][1] = {
+    # dispatcher.bot_data["orders"] = []
+    # dispatcher.bot_data["orders"].append({
     #     "order_index": 1,
     #     'name': "Qian",
     #     'desc': "this",
     #     'price': 6,
     #     'photo': None,
-    # }
+    # })
+
 
     updater.start_polling()
     updater.idle()
