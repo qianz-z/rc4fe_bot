@@ -378,7 +378,7 @@ def admin_order_add_photo(update, context):
             chat_id,
             photo=photo,
             caption=(
-                "PHOTO"
+                "This is the photo that you have sent."
             )
         )
         print(context.bot_data["orders"])
@@ -433,9 +433,13 @@ def admin_order_edit_item_category(update, context):
     return ADMIN_ORDER_EDIT_ITEM_UPDATED
 
 def admin_order_edit_item_updated(update, context):
-    message = update.message.text
-    item_index = context.user_data["edit_index"]
     category = context.user_data["edit_category"]
+    if category == 'photo':
+        message = update.message.photo[-1].file_id
+    else:
+        message = update.message.text
+    
+    item_index = context.user_data["edit_index"]
     order = context.bot_data["orders"][item_index]
     order[category] = message
     text = "This is the updated list, and if you wish to update anything else, please head back to /admin_menu. \n"
@@ -530,7 +534,7 @@ if __name__ == '__main__':
                 MessageHandler(Filters.text, callback=admin_order_add_price),
             ],
             ADMIN_ORDER_ADD_PHOTO:[
-                MessageHandler(Filters.all, callback=admin_order_add_photo),
+                MessageHandler(Filters.photo, callback=admin_order_add_photo),
             ],
             ADMIN_ORDER_EDIT_ITEM:[
                 CallbackQueryHandler(admin_order_edit_item)
@@ -539,7 +543,7 @@ if __name__ == '__main__':
                 CallbackQueryHandler(admin_order_edit_item_category)
             ],
             ADMIN_ORDER_EDIT_ITEM_UPDATED:[
-                MessageHandler(Filters.text, callback=admin_order_edit_item_updated),
+                MessageHandler(Filters.all, callback=admin_order_edit_item_updated),
             ],
             ADMIN_ORDER_REMOVE_ITEM:[
                 CallbackQueryHandler(admin_order_remove_item)
