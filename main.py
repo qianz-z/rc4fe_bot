@@ -1,6 +1,8 @@
 from curses.ascii import isdigit
 import traceback
 from operator import itemgetter
+import json
+from os import (path, mkdir)
 
 from telegram import (
     InlineKeyboardMarkup,
@@ -48,6 +50,15 @@ _STATES = [
 for i, state in enumerate(_STATES):
     globals()[state] = i
 
+def update_user(user_data):
+    chat_id = user_data.get('chat_id', None)
+    if not chat_id:
+        return None
+    if not path.exists('users'):
+        mkdir('users')
+    with open(f'users/{chat_id}.json', 'w') as f:
+        json.dump(user_data, f, sort_keys=True, indent=4)
+
 def start(update, context):
     chat_id = update.effective_chat.id
 
@@ -76,11 +87,21 @@ def start(update, context):
         # RESIDENTS
         text = "Hello! I am RC4fe Telegram bot, called Bob!"
         update.message.reply_text(text)
+        context.user_data['chat_id'] = chat_id
         context.user_data["name"] = None
         context.user_data["mobile"] = None
         context.user_data["house"] = None
         context.user_data["room"] = None
         context.user_data["edit_category"] = None
+        user_data = {
+            'chat_id': chat_id,
+            'username': update.message.from_user.username,
+            'name': '',
+            'mobile': 0,
+            'house': '',
+            'room': '',
+        }
+        update_user(user_data)
         print("RC4fe Bob is alive!")
         return user_menu(update, context)
     else:
@@ -171,6 +192,16 @@ def user_register_room(update, context):
     text += "Thanks for the free stalking information! Just joking! Your details will be protected and will not be shared around. \n"
     text += "If you would like to edit your profile details, you can go to the /user_menu and click on the 'Edit Profile' button."
     update.message.reply_text(text)
+
+    user_data = {
+        'chat_id': context.user_data['chat_id'],
+        'username': update.message.from_user.username,
+        'name': context.user_data['name'],
+        'mobile': context.user_data['mobile'],
+        'house': context.user_data['house'],
+        'room': context.user_data['room'],
+    }
+    update_user(user_data)
     return USER_MENU
 
 # USER EDIT 
